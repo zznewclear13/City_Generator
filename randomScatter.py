@@ -5,7 +5,6 @@ import math
 import random
 import bisect
 from scipy.spatial import Voronoi, voronoi_plot_2d
-
 from itertools import accumulate
 
 class randomScatter():
