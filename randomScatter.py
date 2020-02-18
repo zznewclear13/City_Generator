@@ -7,7 +7,7 @@ import bisect
 from scipy.spatial import Voronoi, voronoi_plot_2d
 from itertools import accumulate
 
-class randomScatter():
+class RandomScatter():
 
     def __init__(self, imagePath, dotsCount, randomBias, reverse=False, squared =False):
         self.imagePath = imagePath
@@ -34,14 +34,8 @@ class randomScatter():
 
     def readImage(self):
         try:
-            self.image = cv2.imread(self.imagePath)
+            self.image = cv2.imread(self.imagePath, cv2.IMREAD_GRAYSCALE)
             self.shape = self.image.shape
-            try:
-                if self.shape[2] == 3:
-                    self.image = self.image[:,:,0]
-                    self.shape = self.image.shape
-            except:
-                pass        
         except:
             print(ERROR_MESSAGE)
             print("Check IMAGE_INPUT_PATH! IMAGE_INPUT_PATH='"+ IMAGE_INPUT_PATH + "'.")
@@ -90,7 +84,7 @@ ERROR_MESSAGE = '----------------------'
 if __name__ == "__main__":
     IMAGE_INPUT_PATH = './image_input/scatter_rate.jpg'
 
-    randomScatterInstance = randomScatter(IMAGE_INPUT_PATH, 200, 0, reverse=True, squared=True)
+    randomScatterInstance = RandomScatter(IMAGE_INPUT_PATH, 200, 0, reverse=True, squared=True)
     randomScatterInstance.readImage()
     randomScatterInstance.randomDots()
     randomScatterInstance.makePoints()

@@ -8,22 +8,30 @@ import copy
 from scipy.spatial import Voronoi, voronoi_plot_2d
 from itertools import accumulate
 
-from randomScatter import randomScatter
+#from randomScatter import RandomScatter
 
-
-RANGE = 5
 
 class VertexBase():
 
     totalIndex = 0
 
-    def __init__(self, position):
+    def __init__(self, position, rangeLimit):
         self.position = np.array(position)
         self.neighborInfo = []
+        self.rangeLimit = rangeLimit
+        self.isInRange()
 
     def getDistance(self, vertex):
         distance = np.linalg.norm(self.position-vertex.position)
         return distance    
+
+    def isInRange(self):
+        if self.position[0]>=0 and self.position[0]<=self.rangeLimit[0] \
+            and self.position[1]>=0 and self.position[1]<=self.rangeLimit[1]:
+            self.inRange = True
+        else:
+            self.inRange = False
+        return self.inRange    
 
     def findNeighbor(self, Vertices, DISTANCE_NEIGHBOR=2):
         self.neighborInfo = []
@@ -33,17 +41,21 @@ class VertexBase():
                 self.neighborInfo += [[vertex, distance]]
         return np.array(self.neighborInfo)
 
-    def randomizePosition(self, RANGE=1):
-        moveDirection = np.random.random_sample((2,))*RANGE*2 - np.array([RANGE,RANGE])
+    def randomPosition(self, randomRange=1):
+        moveDirection = np.random.random_sample((2,))*randomRange*2 - np.array([randomRange,randomRange])
         return self.position + moveDirection 
+
+    def randomizePosition(self, randomRange=1):
+        self.position = self.randomPosition(randomRange)
+        self.isInRange()
 
     def plot(self,alpha=0.2, color='#ff0000'):
         plt.scatter(self.position[1], self.position[0],alpha=alpha, c=color)
 
 class VertexOrigin(VertexBase):
 
-    def __init__(self, position, comesFrom=[]):
-        VertexBase.__init__(self, position)
+    def __init__(self, position, rangeLimit, comesFrom=[]):
+        VertexBase.__init__(self, position, rangeLimit)
         self.index = VertexBase.totalIndex
         VertexBase.totalIndex += 1
 
@@ -56,19 +68,18 @@ class VertexOrigin(VertexBase):
 
         self.goesTo = []
 
-
-    def addNextVertex(self, DISTANCE=5):
+    def addNextVertex(self, directionInstance, distance=5):
         if self.comesFrom != []:
-            for comesFromVertex in self.comesFrom:
-                direction = (self.position - comesFromVertex.position)/self.getDistance(comesFromVertex)
-                nextPosition = self.position + direction * DISTANCE
-                nextVertex = VertexOrigin(nextPosition, comesFrom=[self])
-                nextVertex.position = nextVertex.randomizePosition()
+            directions = directionInstance.getDirection(self)
+            for direction in directions:
+                nextPosition = self.position + direction * distance
+                nextVertex = VertexOrigin(nextPosition, self.rangeLimit, comesFrom=[self])
+                nextVertex.randomizePosition()
             return nextVertex
         else:
-            nextPosition = self.randomizePosition()
-            nextVertex = VertexOrigin(nextPosition, comesFrom=[self])
-            nextVertex.position = nextVertex.randomizePosition()
+            nextPosition = self.randomPosition()
+            nextVertex = VertexOrigin(nextPosition, self.rangeLimit, comesFrom=[self])
+            nextVertex.randomizePosition()
             return nextVertex
 
     def removeVertex(self):
@@ -88,23 +99,25 @@ class VertexOrigin(VertexBase):
             for comesFromVertex in self.comesFrom:
                 plt.plot([self.position[1],comesFromVertex.position[1]],[self.position[0], comesFromVertex.position[0]], alpha=alpha, c=color)
 
-
 class VertexLayer():
 
-    def __init__(self, randomScatterInstance):
+    def __init__(self, randomScatterInstance, directionInstance):
         self.verticesOrigin = []
+        self.rangeLimit = randomScatterInstance.shape
         for point in randomScatterInstance.improvedPoints:
             if point[0] >=0 and point[0] <= randomScatterInstance.shape[0] and point[1] >=0 and point[1] <= randomScatterInstance.shape[1]:
-                self.verticesOrigin += [VertexOrigin(point)]       
+                self.verticesOrigin += [VertexOrigin(point, self.rangeLimit)]       
         self.verticesCurrent = copy.copy(self.verticesOrigin)
         self.verticesAll = copy.copy(self.verticesCurrent)
         self.verticesNext = []
+        self.directionInstance = directionInstance
 
     def getNextVertices(self, DISTANCE_NEXT=5):
         self.verticesNext = []
         for vertex in self.verticesCurrent:
-            vertexNext = vertex.addNextVertex(DISTANCE_NEXT)
-            self.verticesNext += [vertexNext]
+            if vertex.inRange:
+                vertexNext = vertex.addNextVertex(self.directionInstance, distance=5)
+                self.verticesNext += [vertexNext]
 
     def changeNextVertices(self):
         self.verticesCurrent = self.verticesNext
@@ -140,7 +153,8 @@ class VertexLayer():
                 comesFromList = np.array([vertexNeighbor.comesFrom for vertexNeighbor in neighborInfo[:,0]]).flatten()
                 comesFromList = self.nonDuplicate(comesFromList)
 
-                newVertex = VertexOrigin(newPosition, comesFrom=comesFromList)
+                newVertex = VertexOrigin(newPosition, self.rangeLimit, comesFrom=comesFromList)
+                newVertex.isInRange()
                 newVertices += [newVertex]
                 for neighbor in neighborInfo[:,0]:
                     self.verticesNext.remove(neighbor)
@@ -164,31 +178,3 @@ vex3 = vex2.addNextVertex(5)
 print(vex3.comesFrom[0].position)
 vex2.removeVertex()
 '''
-
-IMAGE_INPUT_PATH = './image_input/scatter_rate.jpg'
-
-
-randomScatterInstance = randomScatter(IMAGE_INPUT_PATH, 200, 0, reverse=True, squared=True)
-randomScatterInstance.readImage()
-randomScatterInstance.randomDots()
-randomScatterInstance.makePoints()
-
-#run improvePoints twice to refine points' locations
-randomScatterInstance.improvePoints(randomScatterInstance.points)
-randomScatterInstance.improvePoints(randomScatterInstance.improvedPoints) * 1
-
-vertexLayertInstance = VertexLayer(randomScatterInstance)
-for i in range(6):
-    vertexLayertInstance.getNextVertices()
-    vertexLayertInstance.mergeNextVertices(5)
-    vertexLayertInstance.changeNextVertices()
-
-fig = plt.figure()
-ax = plt.gca()
-ax.set_xlim(left=0, right=randomScatterInstance.shape[1])
-ax.set_ylim(top=0, bottom=randomScatterInstance.shape[0])
-
-vertexLayertInstance.plotLines(vertexLayertInstance.verticesAll)
-print(len(vertexLayertInstance.verticesOrigin))
-vertexLayertInstance.plotVertices(vertexLayertInstance.verticesOrigin)
-plt.show()
