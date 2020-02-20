@@ -38,17 +38,28 @@ if __name__ =="__main__":
     directionInstance = Direction(ROADMAP_RECTANGLE, ROADMAP_CIRCLE)
 
     vertexLayertInstance = VertexLayer(randomScatterInstance, directionInstance)
-    for i in range(20):
-        vertexLayertInstance.getNextVertices()
-        vertexLayertInstance.mergeNextVertices(5)
-        vertexLayertInstance.changeNextVertices()
-
-    fig = plt.figure(figsize=(6,6))
+    
+    plt.ion()
+    plt.ioff()
+    plt.show()
+    fig = plt.figure(figsize=(10,10))
     ax = plt.gca()
     ax.set_xlim(left=0, right=randomScatterInstance.shape[1])
     ax.set_ylim(top=0, bottom=randomScatterInstance.shape[0])
-    vertexLayertInstance.plotLines(vertexLayertInstance.verticesAll)
-    vertexLayertInstance.plotVertices(vertexLayertInstance.verticesOrigin)
+
+    
+    for i in range(20):
+        vertexLayertInstance.getNextVertices()
+        vertexLayertInstance.mergeNextVertices(5)
+        vertexLayertInstance.mergeToAll(3)
+        vertexLayertInstance.plotLines(vertexLayertInstance.verticesNext, True)
+        if len(vertexLayertInstance.verticesNext)<=3:
+            break
+        vertexLayertInstance.changeNextVertices()
+
+
+    #vertexLayertInstance.plotLines(vertexLayertInstance.verticesAll+vertexLayertInstance.verticesOrigin)
+    #vertexLayertInstance.plotVertices(vertexLayertInstance.verticesOrigin)
 
     plt.savefig(IMAGE_OUTPUT_PATH+'output.png')
-    plt.show()
+    plt.pause(0)

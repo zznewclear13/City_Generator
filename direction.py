@@ -22,23 +22,50 @@ class RoadMapBase():
         probability = self.mapInfo[int(position[0])][int(position[1])]/255
         return [probability, self]
 
-    def getDirection(self, vertex):
-        returnDirection = []
+    #return [[main,1][reverseMain,-1]] ...
+    def getOriginalDirection(self, vertex):
         childMainDirection = getattr(self, 'getMainDirection')
         mainDirection = childMainDirection(vertex.position)
+        verticalDirection= [-mainDirection[1], mainDirection[0]]
+        randomDecision = random.random()
+        if randomDecision <0.33:
+            return [[np.array(mainDirection),1], [-np.array(mainDirection),-1]]
+        elif randomDecision <0.66:
+            return [[np.array(mainDirection),1], [np.array(verticalDirection),2], [-np.array(mainDirection),-1], [-np.array(verticalDirection),-2]]
+        else:
+            return [[np.array(verticalDirection),2], [-np.array(verticalDirection),-2]]
+    
+    #return [[mainDirection, 1]] ...
+    def getDirection(self, vertex):
+        childMainDirection = getattr(self, 'getMainDirection')
+        mainDirection = childMainDirection(vertex.position)
+        vectorList = []
+        connectionIntList = []
         for comesFromVertex in vertex.comesFrom:
-            vector = vertex.position - comesFromVertex.position
-            returnDirection += [self.correctDirection(vector, mainDirection)]
-        return returnDirection    
+            vectorList += [vertex.position - comesFromVertex[0].position]
+            connectionIntList += [comesFromVertex[1]]
+        vector = sum(vectorList)/len(vectorList)
 
+        suggestions = self.correctDirection(vector, mainDirection)
+        for i, suggestion in enumerate(suggestions):
+            if suggestion[1] not in connectionIntList:
+                return [suggestion]
+                
+        return None        
+        '''
+        returnDirection = self.correctDirection(vector, mainDirection)[0]
+        return [returnDirection]   
+        ''' 
+
+    # return [mainDirection, 1][reverseMainDirection, -1][verticalDirection, 2][reverseVerticalDirection, -2]
     def correctDirection(self, direction, mainDirection):
         verticalDirection= [-mainDirection[1], mainDirection[0]]
         dotProduct01 = np.dot(direction,mainDirection)  
         dotProduct02 = np.dot(direction, verticalDirection)
         if(abs(dotProduct01) >= abs(dotProduct02)):
-            return np.array(mainDirection) * np.sign(dotProduct01)
+            return [np.array(mainDirection) * np.sign(dotProduct01), np.sign(dotProduct01)], [np.array(verticalDirection) * np.sign(dotProduct02), np.sign(dotProduct02)*2]
         else:
-            return np.array(verticalDirection) * np.sign(dotProduct02)
+            return [np.array(verticalDirection) * np.sign(dotProduct02), np.sign(dotProduct02)*2], [np.array(mainDirection) * np.sign(dotProduct01), np.sign(dotProduct01)]
 
 class RoadMapRectangle(RoadMapBase):
     def __init__(self, path):
@@ -83,7 +110,7 @@ class Direction():
         for path in self.pathToCircle:
             roadMapCircleInstance = RoadMapCircle(path)
             self.roadMapList += [roadMapCircleInstance]    
-        
+
     def getDirection(self, vertex):
         probabilityList = []
         position = vertex.position
@@ -95,10 +122,14 @@ class Direction():
                 print(vertex.position)
                 print(vertex.inRange)
                 print(vertex.rangeLimit)
-                print('----------------------')   
+                print('----------------------') 
         probabilityList.sort(key = lambda x: x[0])    
         choosenMap = probabilityList[-1][1]
-        return choosenMap.getDirection(vertex)  
+
+        if isinstance(vertex, VertexOrigin):
+            return choosenMap.getOriginalDirection(vertex)
+        else:
+            return choosenMap.getDirection(vertex)    
 
 
 if __name__ == "__main__":

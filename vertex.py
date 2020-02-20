@@ -15,10 +15,23 @@ class VertexBase():
 
     totalIndex = 0
 
-    def __init__(self, position, rangeLimit):
+    def __init__(self, position, rangeLimit, comesFrom, connectionInt):
         self.position = np.array(position)
         self.neighborInfo = []
         self.rangeLimit = rangeLimit
+        self.connectionInt = connectionInt
+
+        if comesFrom == [[]]:
+            self.comesFrom = [[]]
+        else:
+            self.comesFrom = comesFrom
+            for comesFromVertex in self.comesFrom:
+                if comesFromVertex[1] == 0:
+                    print(comesFromVertex, 'aaaaaaaaaaaa')
+                comesFromVertex[0].goesTo += [[self, -comesFromVertex[1]]]
+
+        self.goesTo = []
+        self.isActive = True
         self.isInRange()
 
     def getDistance(self, vertex):
@@ -31,73 +44,82 @@ class VertexBase():
             self.inRange = True
         else:
             self.inRange = False
+            self.isActive = False
         return self.inRange    
 
-    def findNeighbor(self, Vertices, DISTANCE_NEIGHBOR=2):
+    def findNeighbor(self, Vertices, distance_neighbor=2):
         self.neighborInfo = []
         for vertex in Vertices:
             distance = self.getDistance(vertex)
-            if distance <= DISTANCE_NEIGHBOR:
+            if distance <= distance_neighbor:
                 self.neighborInfo += [[vertex, distance]]
         return np.array(self.neighborInfo)
 
-    def randomPosition(self, randomRange=1):
+    def randomizePosition(self, randomRange=0.5):
         moveDirection = np.random.random_sample((2,))*randomRange*2 - np.array([randomRange,randomRange])
-        return self.position + moveDirection 
-
-    def randomizePosition(self, randomRange=1):
-        self.position = self.randomPosition(randomRange)
+        self.position += moveDirection
         self.isInRange()
 
-    def plot(self,alpha=0.2, color='#ff0000'):
-        plt.scatter(self.position[1], self.position[0],alpha=alpha, c=color)
-
-class VertexOrigin(VertexBase):
-
-    def __init__(self, position, rangeLimit, comesFrom=[]):
-        VertexBase.__init__(self, position, rangeLimit)
-        self.index = VertexBase.totalIndex
-        VertexBase.totalIndex += 1
-
-        if comesFrom == []:
-            self.comesFrom = []
-        else:
-            self.comesFrom = comesFrom
-            for comesFromVertex in comesFrom:
-                comesFromVertex.goesTo += [self]    
-
-        self.goesTo = []
-
     def addNextVertex(self, directionInstance, distance=5):
-        if self.comesFrom != []:
-            directions = directionInstance.getDirection(self)
+        nextVertices = []
+        directions = directionInstance.getDirection(self)
+        if directions != None:
             for direction in directions:
-                nextPosition = self.position + direction * distance
-                nextVertex = VertexOrigin(nextPosition, self.rangeLimit, comesFrom=[self])
+                nextPosition = self.position + direction[0] * distance
+                connectionInt = -direction[1]
+                nextVertex = VertexDescendant(nextPosition, self.rangeLimit, comesFrom=[[self, connectionInt]]) 
                 nextVertex.randomizePosition()
-            return nextVertex
+                nextVertices += [nextVertex]            
+            return nextVertices
         else:
-            nextPosition = self.randomPosition()
-            nextVertex = VertexOrigin(nextPosition, self.rangeLimit, comesFrom=[self])
-            nextVertex.randomizePosition()
-            return nextVertex
+            print('No vertex was added!')
+            return None    
 
-    def removeVertex(self):
-        VertexBase.totalIndex -= 1
-        print('Total index now is: '+ str(VertexBase.totalIndex))
-    
-        if self.comesFrom != []:
-            for comesFromVertex in self.comesFrom:
-                comesFromVertex.goesTo.remove(self)
+    '''
+    def mapConnectionInt(self, goesToIntList):
+        outputList = np.array(goesToIntList) * -1
+        return outputList
+    '''
 
-        if self.goesTo != []:
-            for goesToVertex in self.goesTo:
-                goesToVertex.comesFrom.remove(self) 
+    def plot(self, alpha=0.2, color='#ff0000'):
+        plt.scatter(self.position[1], self.position[0],alpha=alpha, c=color)
 
     def plotComesFrom(self, alpha=0.2, color='#ff0000'):
         if self.comesFrom != []:
             for comesFromVertex in self.comesFrom:
-                plt.plot([self.position[1],comesFromVertex.position[1]],[self.position[0], comesFromVertex.position[0]], alpha=alpha, c=color)
+                plt.plot([self.position[1],comesFromVertex[0].position[1]],[self.position[0], comesFromVertex[0].position[0]], alpha=alpha, c=color)
+    
+    def plotGoesTo(self, alpha=0.2, color='#ff0000'):
+        if self.goesTo != []:
+            for goesToVertex in self.goesTo:
+                plt.plot([self.position[1],goesToVertex[0].position[1]],[self.position[0], goesToVertex[0].position[0]], alpha=alpha, c=color)
+
+class VertexOrigin(VertexBase):
+
+    def __init__(self, position, rangeLimit, comesFrom=[[]], connectionInt=[]):
+        VertexBase.__init__(self, position, rangeLimit, comesFrom, connectionInt)
+        self.index = VertexBase.totalIndex
+        VertexBase.totalIndex += 1
+
+class VertexDescendant(VertexBase):
+
+    def __init__(self, position, rangeLimit, comesFrom=[[]], connectionInt=[]):
+        VertexBase.__init__(self, position, rangeLimit, comesFrom, connectionInt)
+        self.index = VertexBase.totalIndex
+        VertexBase.totalIndex += 1
+
+    def removeVertex(self):
+        VertexBase.totalIndex -= 1
+        #print('Total index now is: '+ str(VertexBase.totalIndex))
+    
+        if self.comesFrom != [[]]:
+            for comesFromVertex in self.comesFrom:
+                np.delete(comesFromVertex[0].goesTo, np.where(comesFromVertex[0].goesTo[0]==self))
+
+        if self.goesTo != []:
+            for goesToVertex in self.goesTo:
+                np.delete(goesToVertex[0].comesFrom, np.where(goesToVertex[0].comesFrom[0]==self))
+                #goesToVertex.comesFrom.remove(self) 
 
 class VertexLayer():
 
@@ -108,16 +130,18 @@ class VertexLayer():
             if point[0] >=0 and point[0] <= randomScatterInstance.shape[0] and point[1] >=0 and point[1] <= randomScatterInstance.shape[1]:
                 self.verticesOrigin += [VertexOrigin(point, self.rangeLimit)]       
         self.verticesCurrent = copy.copy(self.verticesOrigin)
-        self.verticesAll = copy.copy(self.verticesCurrent)
+        self.verticesAll = []
+        #self.verticesAll = copy.copy(self.verticesCurrent)
         self.verticesNext = []
         self.directionInstance = directionInstance
 
-    def getNextVertices(self, DISTANCE_NEXT=5):
+    def getNextVertices(self, distance_next=5):
         self.verticesNext = []
         for vertex in self.verticesCurrent:
             if vertex.inRange:
-                vertexNext = vertex.addNextVertex(self.directionInstance, distance=5)
-                self.verticesNext += [vertexNext]
+                vertexNext = vertex.addNextVertex(self.directionInstance, distance_next)
+                if vertexNext != None:
+                    self.verticesNext += vertexNext                
 
     def changeNextVertices(self):
         self.verticesCurrent = self.verticesNext
@@ -143,30 +167,56 @@ class VertexLayer():
             print('vertices is empty') 
             return None  
 
-    def mergeNextVertices(self, DISTANCE_MERGE=2):
+    def mergeNextVertices(self, distance_merge=2):
         newVertices = []
         for vertex in self.verticesNext:
-            neighborInfo = vertex.findNeighbor(self.verticesNext, DISTANCE_MERGE)
+            neighborInfo = vertex.findNeighbor(self.verticesNext, distance_merge)
+            comesFromList = []
             if len(neighborInfo) >= 2:
                 newPosition = self.getAveragePosition(neighborInfo[:-1,0])
-
-                comesFromList = np.array([vertexNeighbor.comesFrom for vertexNeighbor in neighborInfo[:,0]]).flatten()
-                comesFromList = self.nonDuplicate(comesFromList)
-
-                newVertex = VertexOrigin(newPosition, self.rangeLimit, comesFrom=comesFromList)
+                for vertexNeighbor in neighborInfo[:,0]:
+                    comesFromList += vertexNeighbor.comesFrom
+                    self.verticesNext.remove(vertexNeighbor)
+                    vertexNeighbor.removeVertex()
+                #comesFromList = np.array([vertexNeighbor.comesFrom for vertexNeighbor in neighborInfo[:,0]]).flatten()
+                #comesFromList = self.nonDuplicate(comesFromList)
+                newVertex = VertexDescendant(newPosition, self.rangeLimit, comesFrom=comesFromList)
                 newVertex.isInRange()
                 newVertices += [newVertex]
-                for neighbor in neighborInfo[:,0]:
-                    self.verticesNext.remove(neighbor)
-        self.verticesNext += newVertices    
 
-    def plotVertices(self, vertices,alpha=0.2, color='#ff0000'):
+        self.verticesNext += newVertices                
+
+    def mergeToAll(self, distance_merge=2):
+        for vertex in self.verticesNext:
+            neighborInfo = vertex.findNeighbor(self.verticesAll, distance_merge)
+            if len(neighborInfo) >= 1:
+                neighborInfo = neighborInfo[neighborInfo[:,1].argsort()]
+                mergeVertex = neighborInfo[0][0]
+                mergeVertex.comesFrom = vertex.comesFrom
+                for comesFromVertex in vertex.comesFrom:
+                    comesFromVertex[0].goesTo += [[mergeVertex, comesFromVertex[1]]]
+                self.verticesNext.remove(vertex)
+                vertex.removeVertex()
+                self.verticesNext += [mergeVertex]
+                self.verticesAll.remove(mergeVertex)
+                mergeVertex.isActive = True
+                mergeVertex.isInRange()
+        
+    def plotVertices(self, vertices, alpha=0.2, color='#ff0000'):
         for vertex in vertices:
             vertex.plot(alpha, color)
+        plt.draw()
+        plt.pause(0.01)    
 
-    def plotLines(self, vertices, alpha=0.2, color='#ff0000'):
-        for vertex in vertices:
-            vertex.plotComesFrom(alpha, color)        
+    def plotLines(self, vertices, comesFrom=True, alpha=0.2, color='#ff0000'):
+        if comesFrom:
+            for vertex in vertices:
+                vertex.plotComesFrom(alpha, color) 
+        else:
+            for vertex in vertices:
+                vertex.plotGoesTo(alpha, color)              
+        plt.draw()
+        plt.pause(0.01)     
 
 
 
