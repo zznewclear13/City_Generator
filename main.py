@@ -21,7 +21,9 @@ if __name__ =="__main__":
     IMAGE_OUTPUT_PATH = './image_output/'
     ROADMAP_RECTANGLE = ['./image_input/roadMapRectangle_00.jpg']
     ROADMAP_CIRCLE = ['./image_input/roadMapCircle_00.jpg',
-                        './image_input/roadMapCircle_01.jpg']
+                        './image_input/roadMapCircle_01.jpg',
+                        './image_input/roadMapCircle_02.jpg',
+                        './image_input/roadMapCircle_03.jpg']
 
     if not os.path.exists(IMAGE_OUTPUT_PATH):
         os.mkdir(IMAGE_OUTPUT_PATH)

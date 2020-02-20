@@ -91,7 +91,7 @@ class RoadMapCircle(RoadMapBase):
         columnIndexList = np.where(rowSum==np.max(rowSum))[0]
         centerX = rowIndexList[len(rowIndexList)//2]
         centerY = columnIndexList[len(columnIndexList)//2]
-        self.center = [centerX, centerY]
+        self.center = [centerY, centerX]
         return self.center
 
     def getMainDirection(self, position):
